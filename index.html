@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reel Downloader | Made By RP</title>
     <style>
-        /* --- Styling for a beautiful UI --- */
         * {
             box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -88,8 +87,6 @@
         #download-link:hover {
             background-color: #218838;
         }
-        
-        /* --- Your custom branding --- */
         .credit {
             margin-top: 35px;
             padding-top: 15px;
@@ -118,7 +115,20 @@
     </div>
 
     <script>
-        /* --- Robust Multi-Server Engine for GitHub Pages --- */
+        // Recursive function to safely find the video URL no matter how the API structures its JSON
+        function findVideoUrl(obj) {
+            if (typeof obj !== 'object' || obj === null) return null;
+            if (obj.video_url) return obj.video_url;
+            if (obj.videoUrl) return obj.videoUrl;
+            if (obj.video_versions && obj.video_versions.length > 0) return obj.video_versions[0].url;
+            
+            for (let key in obj) {
+                const result = findVideoUrl(obj[key]);
+                if (result) return result;
+            }
+            return null;
+        }
+
         async function downloadReel() {
             const urlInput = document.getElementById('reel-url').value.trim();
             const statusMessage = document.getElementById('status-message');
@@ -127,58 +137,53 @@
             statusMessage.innerHTML = "";
             downloadLink.style.display = "none";
 
-            if (!urlInput.includes('instagram.com/')) {
+            // Extract the Shortcode (e.g., C0bxFxjvu_K) from the pasted URL
+            const match = urlInput.match(/(?:reel|p)\/([a-zA-Z0-9_-]+)/);
+            if (!match) {
                 statusMessage.innerHTML = "❌ Please enter a valid Instagram link.";
                 statusMessage.style.color = "#dc2743";
                 return;
             }
+            const shortcode = match[1];
 
             statusMessage.innerHTML = "✨ Fetching video... please wait.";
             statusMessage.style.color = "#0095f6";
 
-            // A list of active community Cobalt servers that allow GitHub Pages connections
-            const cobaltServers = [
-                'https://api.cobalt.pequla.com/',
-                'https://cobalt.q-n-d.de/',
-                'https://cobalt.api.timelessnesses.me/'
-            ];
+            // Your exact RapidAPI credentials
+            const apiKey = '3af37c462emsh434a1b283c4cf58p14bbcbjsn0c46596f8b0b';
+            const apiHost = 'instagram-api-fast-reliable-data-scraper.p.rapidapi.com';
+            const apiUrl = `https://${apiHost}/post?shortcode=${shortcode}`;
 
-            let success = false;
-
-            // The code will try each server one by one until it finds a working one
-            for (let serverUrl of cobaltServers) {
-                try {
-                    const response = await fetch(serverUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ url: urlInput })
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        
-                        if (data && data.url) {
-                            statusMessage.innerHTML = "✅ Success! Your video is ready.";
-                            statusMessage.style.color = "#28a745";
-                            
-                            downloadLink.href = data.url;
-                            downloadLink.style.display = "inline-block";
-                            success = true;
-                            break; // Stop looking for servers because we got the video
-                        }
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'x-rapidapi-key': apiKey,
+                        'x-rapidapi-host': apiHost,
+                        'Content-Type': 'application/json'
                     }
-                } catch (error) {
-                    console.warn(`Server ${serverUrl} failed, trying next...`);
-                    // If this server fails, the loop automatically continues to the next one
-                }
-            }
+                });
 
-            // If all servers in the list are down or blocked
-            if (!success) {
-                statusMessage.innerHTML = "❌ All servers are currently busy. Please try again in a few minutes.";
+                if (!response.ok) {
+                    throw new Error(`Server responded with status ${response.status}`);
+                }
+
+                const data = await response.json();
+                const videoUrl = findVideoUrl(data);
+
+                if (videoUrl) {
+                    statusMessage.innerHTML = "✅ Success! Your video is ready.";
+                    statusMessage.style.color = "#28a745";
+                    
+                    downloadLink.href = videoUrl;
+                    downloadLink.style.display = "inline-block";
+                } else {
+                    statusMessage.innerHTML = "❌ Video found, but no MP4 link was returned. It might be a photo post.";
+                    statusMessage.style.color = "#dc2743";
+                }
+            } catch (error) {
+                console.error("Fetch error:", error);
+                statusMessage.innerHTML = "❌ Connection failed. Check your API limit on RapidAPI.";
                 statusMessage.style.color = "#dc2743";
             }
         }
